@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Form, json, redirect } from "react-router-dom";
+import { Form, redirect, useActionData, useNavigation } from "react-router-dom";
 import { createOrder } from "../../services/apiRestaurant";
 
 // https://uibakery.io/regex-library/phone-number
@@ -33,6 +33,11 @@ const fakeCart = [
 ];
 
 function CreateOrder() {
+  const navigation = useNavigation();
+  const isSubmitting = navigation.state === "submitting";
+
+  const formErrors = useActionData(); // This component (CreateOrder) is linked with Action so we can access its data here to display phone error
+
   // const [withPriority, setWithPriority] = useState(false);
   const cart = fakeCart;
 
@@ -53,6 +58,7 @@ function CreateOrder() {
           <div>
             <input type="tel" name="phone" required />
           </div>
+          {formErrors?.phone && <p>{formErrors.phone}</p>}
         </div>
         <div>
           <label>Address</label>
@@ -71,8 +77,11 @@ function CreateOrder() {
           <label htmlFor="priority">Want to yo give your order priority?</label>
         </div>
         <div>
-          <input type="hidden" name="cart" value={JSON.stringify(cart)} />
-          <button>Order now</button>
+          {/* NOTE: This to get fakeCart data in FORM that will be later goes to acion function on submit*/}
+          <input type="hidden" name="cart" value={JSON.stringify(cart)} />{" "}
+          <button disabled={isSubmitting}>
+            {isSubmitting ? "Placing order..." : "Order now"}
+          </button>
         </div>
       </Form>
     </div>
@@ -90,6 +99,15 @@ export async function action({ request }) {
     cart: JSON.parse(data.cart),
     priority: data.priority === "on",
   };
+
+  // error handling for wrong phone number
+  const errors = {};
+  if (!isValidPhone(order.phone))
+    errors.phone =
+      "Please give your correct phone number. We might need it to contact you.";
+  if (Object.keys(errors).length > 0) return errors;
+
+  // if everything okay, create new order and redirect
   const newOrder = await createOrder(order); // For POST method we send data here
   return redirect(`/order/${newOrder.id}`); // then we redirect to this URL  where we can see data ( id of new order). Redirect is same as Nvaigation that we used in worldwise but that is a hook , that will not work in function
 }
